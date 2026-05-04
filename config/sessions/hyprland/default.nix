@@ -55,4 +55,8 @@
       ${pkgs.rsync}/bin/rsync -a --update /etc/nixos/config/sessions/hyprland/config/ $HOME/.config/hypr/config/
       chmod -R u+w $HOME/.config/hypr/config
   '';
+  home.activation.copyHyprTemplates = lib.hm.dag.entryAfter ["writeBoundary"] ''
+      ${pkgs.rsync}/bin/rsync -a --update /etc/nixos/config/sessions/hyprland/templates/ $HOME/.config/hypr/templates/
+      chmod -R u+w $HOME/.config/hypr/templates
+  '';
 }

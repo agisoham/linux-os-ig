@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Force standard C locale for number formatting (fixes printf decimal/comma issues on varying OS locales)
-export LC_NUMERIC=C
+# Force standard C locale for number formatting and date parsing (fixes printf and date command issues on varying OS locales)
+export LC_ALL=C
 
 # Paths
 cache_dir="$HOME/.cache/quickshell/weather"
@@ -33,11 +33,11 @@ mkdir -p "${cache_dir}"
 
 get_icon() {
     case $1 in
-        "50d"|"50n") icon=""; quote="Mist" ;;
+        "50d"|"50n") icon="󰖑"; quote="Mist" ;;
         "01d") icon=""; quote="Sunny" ;;
         "01n") icon=""; quote="Clear" ;;
         "02d"|"02n"|"03d"|"03n"|"04d"|"04n") icon=""; quote="Cloudy" ;;
-        "09d"|"09n"|"10d"|"10n") icon=""; quote="Rainy" ;;
+        "09d"|"09n"|"10d"|"10n") icon="󰖗"; quote="Rainy" ;;
         "11d"|"11n") icon=""; quote="Storm" ;;
         "13d"|"13n") icon=""; quote="Snow" ;;
         *) icon=""; quote="Unknown" ;;
@@ -109,7 +109,12 @@ get_data() {
     api_cod=$(echo "$raw_api" | jq -r '.cod' 2>/dev/null)
     
     if [ -z "$raw_api" ] || [ -z "$raw_weather" ] || [[ "$api_cod" != "200" ]]; then
-        write_dummy_data
+        # If curl failed (network glitch, rate limit, API downtime), don't destroy
+        # the existing working cache. Just abort the update.
+        # If there is NO cache at all, then fall back to dummy data.
+        if [ ! -f "$json_file" ]; then
+            write_dummy_data
+        fi
         return
     fi
 
