@@ -11,6 +11,8 @@ Item {
     id: root
     focus: true
 
+    Caching { id: paths }
+
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
@@ -193,7 +195,7 @@ Item {
         running: true
         command: [
             "bash", "-c",
-            "CACHE=\"$HOME/.cache/qs_sysinfo.txt\"; " +
+            "CACHE=\"" + paths.getCacheDir("guide") + "/sysinfo.txt\"; " +
             "if [ ! -f \"$CACHE\" ]; then " +
             "  ICON=\"\"; if [ -f ~/.face.icon ]; then ICON=$(readlink -f ~/.face.icon); elif [ -f ~/.face ]; then ICON=$(readlink -f ~/.face); fi; " +
             "  echo \"$(whoami)|$(hostname)|$(uname -r)|$(cat /etc/os-release | grep '^PRETTY_NAME=' | cut -d'=' -f2 | tr -d '\\\"')|$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | xargs)|$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | tail -n1 | cut -d':' -f3 | xargs)|$ICON\" > \"$CACHE\"; " +

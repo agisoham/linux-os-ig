@@ -81,6 +81,19 @@ Item {
     property var swLapData: []
 
     // =========================================================
+    // --- NOTIFICATIONS
+    // =========================================================
+    Process {
+        id: notifyProc
+    }
+
+    function notify(title, message, icon) {
+        notifyProc.running = false; // Reset to allow sequential calls
+        notifyProc.command = ["notify-send", "-a", "Quickshell Timer", "-i", icon, title, message];
+        notifyProc.running = true;
+    }
+
+    // =========================================================
     // --- GLOBAL SHORTCUTS
     // =========================================================
     function toggleActiveTabState() {
@@ -171,7 +184,8 @@ Item {
             id: globalTicker
             interval: 32
             repeat: true
-            running: root.widgetVisible && root.anyTimerActive
+            // The ticker must run even when the widget is hidden so notifications aren't delayed
+            running: root.anyTimerActive 
             onTriggered: {
                 let now = Date.now();
                 
@@ -181,6 +195,7 @@ Item {
                     if (rem <= 0) {
                         stateCache.timerRemainingMs = 0;
                         stateCache.timerTargetEpoch = 0;
+                        root.notify("Timer Finished", "Your timer for " + root.formatTime(stateCache.timerPresetMs, false) + " has completed.", "preferences-system-time");
                     } else {
                         stateCache.timerRemainingMs = rem;
                     }
@@ -199,6 +214,14 @@ Item {
                     if (rem <= 0) {
                         stateCache.pomoTargetEpoch = 0;
                         stateCache.pomoRemainingMs = 0;
+                        
+                        let phase = stateCache.pomoState; // Capture phase before it resets
+                        if (phase === 0) {
+                            root.notify("Focus Complete", "Great job! Time to take a well-deserved break.", "face-smile");
+                        } else {
+                            root.notify("Break Over", "Break time is up. Let's get back to focus!", "task-due");
+                        }
+                        
                         pomodoroView.handleSessionComplete();
                     } else {
                         stateCache.pomoRemainingMs = rem;
@@ -809,6 +832,12 @@ Item {
                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 stateCache.pomoTargetEpoch = 0;
+                                let phase = stateCache.pomoState;
+                                if (phase === 0) {
+                                    root.notify("Pomodoro Skipped", "Focus session skipped. Moving to break.", "media-skip-forward");
+                                } else {
+                                    root.notify("Pomodoro Skipped", "Break skipped. Moving back to focus.", "media-skip-forward");
+                                }
                                 pomodoroView.handleSessionComplete();
                             }
                         }
@@ -818,4 +847,3 @@ Item {
         }
     }
 }
-

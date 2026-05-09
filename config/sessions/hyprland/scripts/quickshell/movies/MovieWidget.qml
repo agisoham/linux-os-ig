@@ -11,6 +11,9 @@ Item {
     id: window
     focus: true
 
+    Caching { id: paths }
+    readonly property string moviesCache: paths.getCacheDir("movies")
+
     Scaler {
         id: scaler
         currentWidth: Screen.width
@@ -101,13 +104,13 @@ Item {
     // --- SHARED DISK I/O HELPER ---
     function saveJsonToCache(filename, dataObj) {
         let jsStr = JSON.stringify(dataObj).replace(/'/g, "'\\''")
-        Quickshell.execDetached(["bash", "-c", "mkdir -p ~/.cache && echo '" + jsStr + "' > ~/.cache/" + filename])
+        Quickshell.execDetached(["bash", "-c", "echo '" + jsStr + "' > " + window.moviesCache + "/" + filename])
     }
 
     // --- PERSISTENT CACHE IO ---
     Process {
         id: readHistoryProc
-        command: ["bash", "-c", "cat ~/.cache/qs_movie_history.json 2>/dev/null || echo '[]'"]
+        command: ["bash", "-c", "cat " + window.moviesCache + "/qs_movie_history.json 2>/dev/null || echo '[]'"]
         running: false
         stdout: SplitParser {
             onRead: (data) => {
@@ -124,7 +127,7 @@ Item {
 
     Process {
         id: readWatchHistoryProc
-        command: ["bash", "-c", "cat ~/.cache/qs_movie_watch_history.json 2>/dev/null || echo '[]'"]
+        command: ["bash", "-c", "cat " + window.moviesCache + "/qs_movie_watch_history.json 2>/dev/null || echo '[]'"]
         running: false
         stdout: SplitParser {
             onRead: (data) => {
@@ -161,7 +164,7 @@ Item {
 
     Process {
         id: readTrendingCacheProc
-        command: ["bash", "-c", "cat ~/.cache/qs_trending_cache.json 2>/dev/null || echo '{}'"]
+        command: ["bash", "-c", "cat " + window.moviesCache + "/qs_trending_cache.json 2>/dev/null || echo '{}'"]
         running: false
         stdout: SplitParser {
             onRead: (data) => {
@@ -179,7 +182,7 @@ Item {
 
     Process {
         id: readUiStateProc
-        command: ["bash", "-c", "cat ~/.cache/qs_ui_state.json 2>/dev/null || echo '{}'"]
+        command: ["bash", "-c", "cat " + window.moviesCache + "/qs_ui_state.json 2>/dev/null || echo '{}'"]
         running: false
         stdout: SplitParser {
             onRead: (data) => {
@@ -240,7 +243,7 @@ Item {
     property var sourcePrefs: ({})
     Process {
         id: readSourcePrefsProc
-        command: ["bash", "-c", "cat ~/.cache/qs_source_prefs.json 2>/dev/null || echo '{}'"]
+        command: ["bash", "-c", "cat " + window.moviesCache + "/qs_source_prefs.json 2>/dev/null || echo '{}'"]
         running: false
         stdout: SplitParser {
             onRead: (data) => {

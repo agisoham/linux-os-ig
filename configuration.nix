@@ -19,8 +19,10 @@
     wget 
     taskwarrior3
     inotify-tools
+    lavat
     file
     pipes 
+    clock-rs
     cbonsai
     git
     killall

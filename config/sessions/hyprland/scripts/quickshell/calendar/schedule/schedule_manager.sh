@@ -1,7 +1,13 @@
 #!/bin/bash
 
+# -----------------------------------------------------------------------------
+# CACHING & MIGRATION
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/../../../caching.sh"
+qs_ensure_cache "schedule"
+
 # Keeping the cache in the same place so we don't break anything else
-CACHE_DIR="$HOME/.cache/quickshell/schedule"
+CACHE_DIR="$QS_CACHE_SCHEDULE"
 CACHE_FILE="${CACHE_DIR}/schedule.json"
 CACHE_LIMIT=600 # 1 Hour
 

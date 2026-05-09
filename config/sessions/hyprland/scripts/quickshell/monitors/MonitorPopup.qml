@@ -9,6 +9,8 @@ Item {
     id: window
     focus: true
 
+    Caching { id: paths }
+
     // --- Responsive Scaling Logic ---
     Scaler {
         id: scaler
@@ -23,7 +25,7 @@ Item {
     // Custom File Logger
     function debugLog(msg) {
         let safeMsg = msg.replace(/'/g, "'\\''");
-        Quickshell.execDetached(["sh", "-c", "echo '" + safeMsg + "' >> /tmp/monitor_popup.log"]);
+        Quickshell.execDetached(["sh", "-c", "echo '" + safeMsg + "' >> " + paths.logDir + "/monitor_popup.log"]);
     }
     
     // -------------------------------------------------------------------------

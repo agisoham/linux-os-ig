@@ -2,9 +2,15 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import ".." // Imports Caching.qml from the parent quickshell directory
 
 Item {
     id: root
+
+    // =========================================================
+    // --- CACHING SYSTEM
+    // =========================================================
+    Caching { id: paths }
 
     // =========================================================
     // --- MODULE CAPABILITIES EXPORT
@@ -541,7 +547,7 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        var tempPath = "/tmp/quick_action_drawing.png";
+                        var tempPath = paths.getRunDir("quickactions") + "/drawing.png";
                         drawCanvas.save(tempPath);
                         Quickshell.execDetached(["sh", "-c", "wl-copy < " + tempPath]);
                     }

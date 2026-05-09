@@ -4,9 +4,12 @@
 STRICT_SPAM_FILTER=true
 # ---------------------
 
-CACHE_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/quickshell_network_cache"
-mkdir -p "$CACHE_DIR"
-PID_FILE="$CACHE_DIR/bt_scan_pid"
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/../../caching.sh"
+qs_ensure_cache "network"
+
+CACHE_DIR="$QS_CACHE_NETWORK"
+PID_FILE="$QS_RUN_DIR/bt_scan_pid"
 
 get_icon() {
     local type="${1,,}"

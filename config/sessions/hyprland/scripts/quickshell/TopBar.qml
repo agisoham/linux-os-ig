@@ -1,4 +1,3 @@
-//@ pragma UseQApplication
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
@@ -14,18 +13,16 @@ Variants {
         PanelWindow {
             id: barWindow
             property bool pendingReload: false
-	    
-	    Connections {
-                target: Quickshell
+            
+	    Caching { id: paths }
 
-                function onReloadCompleted() {
-                    Quickshell.inhibitReloadPopup()
-                }
-
-                function onReloadFailed(errorString) {
-                    Quickshell.inhibitReloadPopup()
-                }
-    	    }        
+	    Component.onCompleted: {
+ 	        console.log("runDir:", paths.runDir)
+ 	        console.log("manual path:", paths.runDir + "/workspaces")
+ 	        console.log("env test:", Quickshell.env("QS_RUN_WORKSPACES"))
+ 	        console.log("wsPath:", paths.getRunDir("workspaces"))
+	    }	     	
+        
             IpcHandler {
                 target: "topbar"
                 function forceReload() {
@@ -101,7 +98,7 @@ Variants {
 
             Process {
                 id: widgetPoller
-                command: ["bash", "-c", "cat /tmp/qs_current_widget 2>/dev/null || echo ''"]
+                command: ["bash", "-c", "cat " + paths.runDir + "/current_widget 2>/dev/null || echo ''"]
                 running: true
                 stdout: StdioCollector {
                     onStreamFinished: {
@@ -113,7 +110,7 @@ Variants {
 
             Process {
                 id: widgetWatcher
-                command: ["bash", "-c", "while [ ! -f /tmp/qs_current_widget ]; do sleep 1; done; inotifywait -qq -e modify,close_write /tmp/qs_current_widget"]
+                command: ["bash", "-c", "while [ ! -f " + paths.runDir + "/current_widget ]; do sleep 1; done; inotifywait -qq -e modify,close_write " + paths.runDir + "/current_widget"]
                 running: true
                 onExited: {
                     widgetPoller.running = false;
@@ -125,7 +122,7 @@ Variants {
             
             Process {
                 id: recPoller
-                command: ["bash", "-c", "if [ -s ~/.cache/qs_recording_state/rec_pid ] && kill -0 $(cat ~/.cache/qs_recording_state/rec_pid) 2>/dev/null; then echo '1'; else echo '0'; fi"]
+                command: ["bash", "-c", "if [ -s " + paths.getCacheDir("recording") + "/rec_pid ] && kill -0 $(cat " + paths.getCacheDir("recording") + "/rec_pid) 2>/dev/null; then echo '1'; else echo '0'; fi"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         barWindow.isRecording = (this.text.trim() === "1");
@@ -143,7 +140,7 @@ Variants {
 
             Process {
                 id: updatePoller
-                command: ["bash", "-c", "if [ -f ~/.cache/qs_update_pending ]; then echo '1'; else echo '0'; fi"]
+                command: ["bash", "-c", "if [ -f " + paths.getCacheDir("updater") + "/update_pending ]; then echo '1'; else echo '0'; fi"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         barWindow.updateAvailable = (this.text.trim() === "1");
@@ -286,13 +283,14 @@ Variants {
 
             Process {
                 id: wsDaemon
-                command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/workspaces.sh"]
+                command: ["bash", "-c", "~/.config/hypr/scripts/workspaces.sh"]
                 running: true
             }
 
             Process {
-                id: wsReader
-                command: ["cat", "/tmp/qs_workspaces.json"]
+		id: wsReader
+		running: true
+                command: ["cat", paths.getRunDir("workspaces") + "/workspaces.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();
@@ -334,7 +332,7 @@ Variants {
             Process {
                 id: wsWatcher
                 running: true
-                command: ["bash", "-c", "inotifywait -qq -e close_write,modify /tmp/qs_workspaces.json"]
+                command: ["bash", "-c", "inotifywait -qq -e close_write,modify " + paths.getRunDir("workspaces") + "/workspaces.json"]
                 onExited: {
                     wsReader.running = false;
                     wsReader.running = true;
@@ -346,7 +344,7 @@ Variants {
             Process {
                 id: musicForceRefresh
                 running: true
-                command: ["bash", "-c", "bash ~/.config/hypr/scripts/quickshell/music/music_info.sh | tee /tmp/music_info.json"]
+                command: ["bash", "-c", "bash ~/.config/hypr/scripts/quickshell/music/music_info.sh | tee " + paths.getRunDir("music") + "/music_info.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();
@@ -530,7 +528,6 @@ Variants {
                 }
             }
             Process { id: batteryWaiter; command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/watchers/battery_wait.sh"]; onExited: { batteryPoller.running = false; batteryPoller.running = true; } }
-
 
             Process {
                 id: weatherPoller
@@ -1503,10 +1500,10 @@ Variants {
                                     }
                                 }
                                 MouseArea { id: batMouse; hoverEnabled: true; anchors.fill: parent; onClicked: Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs_manager.sh toggle battery"]) }
-                            }                        
-	         	}
-		    }
-		    Rectangle {
+                            }                       
+                 }
+            }
+            Rectangle {
                         id: recButton
                         property bool isHovered: recMouse.containsMouse
                         

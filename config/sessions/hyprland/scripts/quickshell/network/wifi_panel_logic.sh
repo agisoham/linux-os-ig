@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/../../caching.sh"
+qs_ensure_cache "network"
+
 # Zero-latency hardware presence check via sysfs (Instant, no nmcli hang)
 if ! ls -1d /sys/class/net/*/wireless &>/dev/null; then
     echo '{ "present": false, "power": "off", "connected": null, "networks": [] }'
@@ -22,7 +26,7 @@ get_icon() {
     else echo "󰤯"; fi
 }
 
-CACHE_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/quickshell_network_cache"
+CACHE_DIR="$QS_CACHE_NETWORK"
 mkdir -p "$CACHE_DIR"
 
 CURRENT_RAW=$(LC_ALL=C nmcli -t -f active,ssid,signal,security device wifi | awk -F: '$1=="yes"{print; exit}')

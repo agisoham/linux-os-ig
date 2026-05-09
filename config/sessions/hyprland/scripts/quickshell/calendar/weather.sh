@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 
+# -----------------------------------------------------------------------------
+# CACHING & MIGRATION
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+qs_ensure_cache "weather"
+
 # Force standard C locale for number formatting and date parsing (fixes printf and date command issues on varying OS locales)
 export LC_ALL=C
 
 # Paths
-cache_dir="$HOME/.cache/quickshell/weather"
+cache_dir="$QS_CACHE_WEATHER"
 json_file="${cache_dir}/weather.json"
 view_file="${cache_dir}/view_id"
 daily_cache_file="${cache_dir}/daily_weather_cache.json"

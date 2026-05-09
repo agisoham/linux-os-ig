@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 
-TMP_DIR="/tmp/eww_covers"
+# -----------------------------------------------------------------------------
+# CACHING
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+qs_ensure_cache "music"
+
+TMP_DIR="$QS_RUN_MUSIC/covers"
+STATE_FILE="$QS_STATE_MUSIC/last_state.json"
+
 mkdir -p "$TMP_DIR"
 PLACEHOLDER="$TMP_DIR/placeholder_blank.png"
-STATE_FILE="$TMP_DIR/last_state.json"
 
 # Prevent cold-boot D-Bus hangs from keeping the script alive
 PT="timeout 1.5 playerctl"

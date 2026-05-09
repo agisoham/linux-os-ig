@@ -6,6 +6,8 @@ import Quickshell.Io
 Item {
     id: root
     
+    Caching { id: paths }
+    
     // --- Centralized Properties ---
     property int cpu: 0
     property int ramPercent: 0
@@ -48,7 +50,8 @@ Item {
         id: fetchProc
         running: false
         // Safely delegates path expansion directly to bash, preventing QML parsing issues
-        command: ["bash", "-c", "bash ~/.config/hypr/scripts/quickshell/watchers/sys_fetcher.sh"]
+        // Passes dynamic sysdata cache dir in case the script needs it
+        command: ["bash", "-c", "export QS_CACHE_SYSDATA=" + paths.getCacheDir("sysdata") + "; bash ~/.config/hypr/scripts/quickshell/watchers/sys_fetcher.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let text = this.text ? this.text.trim() : "";

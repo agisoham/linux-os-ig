@@ -12,18 +12,8 @@ import "notifications" as Notifs
 PanelWindow {
     id: masterWindow
     color: "transparent"
-
-    Connections {
-        target: Quickshell
-
-        function onReloadCompleted() {
-            Quickshell.inhibitReloadPopup()
-        }
-
-        function onReloadFailed(errorString) {
-            Quickshell.inhibitReloadPopup()
-        }
-    }
+    
+    Caching { id: paths }
 
     IpcHandler {
         target: "main"
@@ -54,7 +44,7 @@ PanelWindow {
         height: 48 
 
         anchors.leftMargin: (masterWindow.currentActive !== "hidden" && masterWindow.animX < 10 && masterWindow.animY < height) ? masterWindow.animW : 0
-	anchors.rightMargin: (masterWindow.currentActive !== "hidden" && (masterWindow.animX + masterWindow.animW) > (parent.width - 10) && masterWindow.animY < height) ? masterWindow.animW : 0 
+    anchors.rightMargin: (masterWindow.currentActive !== "hidden" && (masterWindow.animX + masterWindow.animW) > (parent.width - 10) && masterWindow.animY < height) ? masterWindow.animW : 0 
 
         Behavior on anchors.leftMargin { NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
         Behavior on anchors.rightMargin { NumberAnimation { duration: masterWindow.morphDuration; easing.type: Easing.InOutCubic } }
@@ -91,7 +81,7 @@ PanelWindow {
     property string currentActive: "hidden"
 
     onCurrentActiveChanged: {
-        Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > /tmp/qs_current_widget"]);
+        Quickshell.execDetached(["bash", "-c", "echo '" + currentActive + "' > " + paths.runDir + "/current_widget"]);
     }
 
     property bool isVisible: false
@@ -369,9 +359,9 @@ PanelWindow {
         masterWindow.targetH = t.h;
         
         let props = newWidget === "wallpaper" ? { "widgetArg": arg } : {};
-	props["notifModel"] = masterWindow.notifModel;
-	props["layoutWidth"] = t.w;
-	props["layoutHeight"] = t.h;
+    props["notifModel"] = masterWindow.notifModel;
+    props["layoutWidth"] = t.w;
+    props["layoutHeight"] = t.h;
 
         if (immediate) {
             widgetStack.replace(t.comp, props, StackView.Immediate);
@@ -402,9 +392,9 @@ PanelWindow {
     Process {
         id: ipcWatcher
         command: ["bash", "-c",
-            "touch /tmp/qs_widget_state; " +
-            "inotifywait -qq -e close_write /tmp/qs_widget_state 2>/dev/null; " +
-            "cat /tmp/qs_widget_state"
+            "touch " + paths.runDir + "/widget_state; " +
+            "inotifywait -qq -e close_write " + paths.runDir + "/widget_state 2>/dev/null; " +
+            "cat " + paths.runDir + "/widget_state"
         ]
         running: true
         stdout: StdioCollector {

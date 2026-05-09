@@ -8,6 +8,8 @@ import "../" // Resolves the SysData singleton from the parent directory
 Item {
     id: root
 
+    Caching { id: paths }
+
     // By NOT declaring these as local properties, we allow QML to naturally 
     // inherit them from the parent Loader in Floating.qml
     property string safeActiveEdge: typeof activeEdge !== "undefined" ? activeEdge : "left"

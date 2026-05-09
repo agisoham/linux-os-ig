@@ -1,19 +1,31 @@
 #!/usr/bin/env bash
 
 # -----------------------------------------------------------------------------
+# CACHING & MIGRATION
+# -----------------------------------------------------------------------------
+source "$(dirname "${BASH_SOURCE[0]}")/caching.sh"
+
+# Ensure all needed widget cache dirs exist
+qs_ensure_cache "workspaces"
+qs_ensure_cache "network"
+qs_ensure_cache "wallpaper_picker"
+
+# -----------------------------------------------------------------------------
 # CONSTANTS & ARGUMENTS
 # -----------------------------------------------------------------------------
-QS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BT_PID_FILE="$HOME/.cache/bt_scan_pid"
-BT_SCAN_LOG="$HOME/.cache/bt_scan.log"
+BT_PID_FILE="$QS_RUN_DIR/bt_scan_pid"
+BT_SCAN_LOG="$QS_LOG_DIR/bt_scan.log"
 SRC_DIR="${WALLPAPER_DIR:-${srcdir:-$HOME/Pictures/Wallpapers}}"
-THUMB_DIR="$HOME/.cache/wallpaper_picker/thumbs"
+THUMB_DIR="$QS_CACHE_WALLPAPER_PICKER/thumbs"
+PREP_LOCK="$QS_RUN_DIR/wallpaper_prep.lock"
 
-# User-specific cache directory matching the QML logic
-QS_NETWORK_CACHE="${XDG_RUNTIME_DIR:-$HOME/.cache}/qs_network"
-mkdir -p "$QS_NETWORK_CACHE"
+# Hard cap: one ImageMagick thread, one job at a time — no CPU spike
+export MAGICK_THREAD_LIMIT=1
 
-IPC_FILE="/tmp/qs_widget_state"
+QS_NETWORK_CACHE="$QS_CACHE_NETWORK"
+mkdir -p "$QS_NETWORK_CACHE" "$THUMB_DIR"
+
+IPC_FILE="$QS_RUN_DIR/widget_state"
 NETWORK_MODE_FILE="$QS_NETWORK_CACHE/mode"
 
 ACTION="$1"
@@ -44,23 +56,73 @@ handle_wallpaper_prep() {
     mkdir -p "$THUMB_DIR"
 
     (
-        export THUMB_DIR SRC_DIR MANIFEST
+        # Prevent multiple concurrent generation instances
+        # Moved inside the subshell to track the actual background process
+        if [ -f "$PREP_LOCK" ]; then
+            if kill -0 "$(cat "$PREP_LOCK")" 2>/dev/null; then
+                exit 0
+            fi
+        fi
+        # Use $BASHPID to record the PID of this specific background subshell
+        echo $BASHPID > "$PREP_LOCK"
 
-        process_one() {
-            img="$1"
-            filename=$(basename "$img")
+        export THUMB_DIR SRC_DIR MANIFEST MAGICK_THREAD_LIMIT=1
+
+        # Check for source directory change — wipe thumbs if it moved
+        THUMB_SOURCE_FILE="$THUMB_DIR/.source_dir"
+        if [ -f "$THUMB_SOURCE_FILE" ]; then
+            read -r CACHED_SRC < "$THUMB_SOURCE_FILE"
+            if [ "$CACHED_SRC" != "$SRC_DIR" ]; then
+                find "$THUMB_DIR" -maxdepth 1 -type f \
+                    ! -name '.source_dir' ! -name '.manifest' -delete
+                echo "$SRC_DIR" > "$THUMB_SOURCE_FILE"
+                > "$MANIFEST"
+            fi
+        else
+            echo "$SRC_DIR" > "$THUMB_SOURCE_FILE"
+            > "$MANIFEST"
+        fi
+
+        [ ! -f "$MANIFEST" ] && build_manifest
+
+        SRC_LIST=$(mktemp)
+        find "$SRC_DIR" -maxdepth 1 -type f \
+            \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \
+               -o -iname "*.gif" -o -iname "*.mp4" -o -iname "*.mkv" \
+               -o -iname "*.mov" -o -iname "*.webm" \) \
+            -printf "%f\n" | sort > "$SRC_LIST"
+
+        # Remove orphaned thumbnails (source file was deleted)
+        comm -23 <(sed 's/^000_//' "$MANIFEST" | sort) "$SRC_LIST" | while read -r orphan; do
+            rm -f "$THUMB_DIR/$orphan" "$THUMB_DIR/000_$orphan"
+            sed -i "/^${orphan}$/d;/^000_${orphan}$/d" "$MANIFEST"
+        done
+
+        # Generate missing thumbnails — strictly one at a time to avoid CPU spikes.
+        # comm -23 gives us files in SRC_LIST that are not yet in MANIFEST.
+        while IFS= read -r filename; do
+            img="$SRC_DIR/$filename"
+            [ -f "$img" ] || continue
+
             extension="${filename##*.}"
+
+            # Convert webp to jpg for better QML compatibility
             if [[ "${extension,,}" == "webp" ]]; then
                 new_img="${img%.*}.jpg"
                 magick "$img" "$new_img" && rm -f "$img"
-                img="$new_img"; filename=$(basename "$img"); extension="jpg"
+                img="$new_img"
+                filename="$(basename "$img")"
+                extension="jpg"
             fi
+
             if [[ "${extension,,}" =~ ^(mp4|mkv|mov|webm)$ ]]; then
                 thumb="$THUMB_DIR/000_$filename"
+                # Clean up any non-prefixed leftover
                 [ -f "$THUMB_DIR/$filename" ] && rm -f "$THUMB_DIR/$filename"
                 if [ ! -f "$thumb" ]; then
+                    # Single-threaded ffmpeg — quiet, low impact
                     ffmpeg -y -ss 00:00:05 -i "$img" -vframes 1 \
-                        -f image2 -q:v 2 "$thumb" >/dev/null 2>&1
+                        -threads 1 -f image2 -q:v 2 "$thumb" >/dev/null 2>&1
                     echo "000_$filename" >> "$MANIFEST"
                 fi
             else
@@ -70,75 +132,11 @@ handle_wallpaper_prep() {
                     echo "$filename" >> "$MANIFEST"
                 fi
             fi
-        }
-        export -f process_one
+        done < <(comm -23 "$SRC_LIST" <(sed 's/^000_//' "$MANIFEST" | sort))
 
-        # Source dir change — nuke everything and rebuild
-        THUMB_SOURCE_FILE="$THUMB_DIR/.source_dir"
-        if [ -f "$THUMB_SOURCE_FILE" ]; then
-            read -r CACHED_SRC < "$THUMB_SOURCE_FILE"
-            if [ "$CACHED_SRC" != "$SRC_DIR" ]; then
-                find "$THUMB_DIR" -maxdepth 1 -type f \
-                    ! -name '.source_dir' ! -name '.manifest' -delete
-                echo "$SRC_DIR" > "$THUMB_SOURCE_FILE"
-                > "$MANIFEST"  # reset manifest
-            fi
-        else
-            echo "$SRC_DIR" > "$THUMB_SOURCE_FILE"
-            > "$MANIFEST"
-        fi
-
-        # Build manifest if missing
-        [ ! -f "$MANIFEST" ] && build_manifest
-
-        # Get current src files (one find, sorted)
-        SRC_LIST=$(mktemp)
-        find "$SRC_DIR" -maxdepth 1 -type f \
-            \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \
-               -o -iname "*.gif" -o -iname "*.mp4" -o -iname "*.mkv" \
-               -o -iname "*.mov" -o -iname "*.webm" \) \
-            -printf "%f\n" | sort > "$SRC_LIST"
-
-        # Orphans: in manifest but not in src anymore
-        comm -23 \
-            <(sed 's/^000_//' "$MANIFEST" | sort) \
-            "$SRC_LIST" \
-        | while read -r orphan; do
-            rm -f "$THUMB_DIR/$orphan" "$THUMB_DIR/000_$orphan"
-            # Remove from manifest
-            sed -i "/^${orphan}$/d;/^000_${orphan}$/d" "$MANIFEST"
-        done
-
-        # New files: in src but not in manifest
-        comm -23 \
-            "$SRC_LIST" \
-            <(sed 's/^000_//' "$MANIFEST" | sort) \
-        | xargs -P 8 -I{} bash -c 'process_one "$SRC_DIR/$@"' _ {}
-
-        rm -f "$SRC_LIST"
-
+        rm -f "$SRC_LIST" "$PREP_LOCK"
     ) </dev/null >/dev/null 2>&1 &
-
-    # swww/mpvpaper detection (unchanged, fast)
-    TARGET_THUMB=""
-    CURRENT_SRC=""
-    if pgrep -a "mpvpaper" > /dev/null; then
-        CURRENT_SRC=$(pgrep -a mpvpaper | grep -o "$SRC_DIR/[^' ]*" | head -n1)
-        CURRENT_SRC=$(basename "$CURRENT_SRC")
-    fi
-    if [ -z "$CURRENT_SRC" ] && command -v swww >/dev/null; then
-        CURRENT_SRC=$(swww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
-        CURRENT_SRC=$(basename "$CURRENT_SRC")
-    fi
-    if [ -n "$CURRENT_SRC" ]; then
-        EXT="${CURRENT_SRC##*.}"
-        [[ "${EXT,,}" =~ ^(mp4|mkv|mov|webm)$ ]] \
-            && TARGET_THUMB="000_$CURRENT_SRC" \
-            || TARGET_THUMB="$CURRENT_SRC"
-    fi
-    export WALLPAPER_THUMB="$TARGET_THUMB"
 }
-
 
 handle_network_prep() {
     echo "" > "$BT_SCAN_LOG"
@@ -150,22 +148,11 @@ handle_network_prep() {
 # -----------------------------------------------------------------------------
 # ZOMBIE WATCHDOG
 # -----------------------------------------------------------------------------
-MAIN_QML_PATH="$HOME/.config/hypr/scripts/quickshell/Main.qml"
-BAR_QML_PATH="$HOME/.config/hypr/scripts/quickshell/TopBar.qml"
-FLOATING_QML_PATH="$HOME/.config/hypr/scripts/quickshell/Floating.qml"
+SCRIPTS_DIR="$HOME/.config/hypr/scripts/quickshell"
+SHELL_QML_PATH="$SCRIPTS_DIR/Shell.qml"
 
-if ! pgrep -f "quickshell.*Main\.qml" >/dev/null; then
-    quickshell -p "$MAIN_QML_PATH" >/dev/null 2>&1 &
-    disown
-fi
-
-if ! pgrep -f "quickshell.*Floating\.qml" >/dev/null; then
-    quickshell -p "$FLOATING_QML_PATH" >/dev/null 2>&1 &
-    disown
-fi
-
-if ! pgrep -f "quickshell.*TopBar\.qml" >/dev/null; then
-    quickshell -p "$BAR_QML_PATH" >/dev/null 2>&1 &
+if ! pgrep -f "quickshell.*Shell.qml" >/dev/null; then
+    quickshell -p "$SHELL_QML_PATH" >/dev/null 2>&1 &
     disown
 fi
 
@@ -185,8 +172,6 @@ if [[ "$ACTION" == "close" ]]; then
 fi
 
 if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
-    CURRENT_MODE=$(cat "$NETWORK_MODE_FILE" 2>/dev/null)
-
     if [[ "$TARGET" == "network" ]]; then
         handle_network_prep
         [[ -n "$SUBTARGET" ]] && echo "$SUBTARGET" > "$NETWORK_MODE_FILE"
@@ -196,7 +181,21 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
 
     if [[ "$TARGET" == "wallpaper" ]]; then
         handle_wallpaper_prep
-        echo "$ACTION:$TARGET:$WALLPAPER_THUMB" > "$IPC_FILE"
+        CURRENT_SRC=""
+        if pgrep -a "mpvpaper" > /dev/null; then
+            CURRENT_SRC=$(pgrep -a mpvpaper | grep -o "$SRC_DIR/[^' ]*" | head -n1)
+        elif command -v swww >/dev/null; then
+            CURRENT_SRC=$(swww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
+        fi
+        
+        TARGET_THUMB=""
+        if [ -n "$CURRENT_SRC" ]; then
+            BASE=$(basename "$CURRENT_SRC")
+            EXT="${BASE##*.}"
+            [[ "${EXT,,}" =~ ^(mp4|mkv|mov|webm)$ ]] && TARGET_THUMB="000_$BASE" || TARGET_THUMB="$BASE"
+        fi
+        
+        echo "$ACTION:$TARGET:$TARGET_THUMB" > "$IPC_FILE"
     else
         echo "$ACTION:$TARGET:$SUBTARGET" > "$IPC_FILE"
     fi

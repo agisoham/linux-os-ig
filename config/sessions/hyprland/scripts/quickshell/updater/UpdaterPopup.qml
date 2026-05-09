@@ -11,6 +11,9 @@ import "../"
 Item {
     id: window
     focus: true
+
+    Caching { id: paths }
+    readonly property string videoPath: paths.getRunDir("updater") + "/video.mp4"
     
     // WAYLAND ANTI-DEADLOCK: Guarantee the initial frame is never 0x0.
     // If mainCard.width evaluates to 0 on tick 1, it falls back to raw 500.
@@ -177,10 +180,10 @@ except Exception:
         id: videoDownloadProcess
         running: false
         // Quietly pulls the mp4 to RAM/tmpfs to avoid locking the UI thread
-        command: ["bash", "-c", "curl -m 60 -s -L -o /tmp/qs_updater_video.mp4 " + window.videoUrl]
+        command: ["bash", "-c", "curl -m 60 -s -L -o '" + window.videoPath + "' " + window.videoUrl]
         onExited: {
             if (exitCode === 0) {
-                videoPlayer.source = "file:///tmp/qs_updater_video.mp4";
+                videoPlayer.source = "file://" + window.videoPath;
                 videoPlayer.play();
                 window.videoReady = true; // Fades out spinner, fades in video
             }

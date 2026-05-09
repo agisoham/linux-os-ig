@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-PIPE="/tmp/qs_network_wait_$$.fifo"
+source "$(dirname "${BASH_SOURCE[0]}")/../../caching.sh"
+
+PIPE="$QS_RUN_DIR/qs_network_wait_$$.fifo"
 mkfifo "$PIPE" 2>/dev/null
 
 # Trap ensures we delete the FIFO and specifically kill nmcli, leaving no zombie processes

@@ -11,6 +11,8 @@ Item {
     id: window
     focus: true
 
+    Caching { id: paths }
+
     Scaler {
         id: scaler
         currentWidth: Screen.width
@@ -51,7 +53,7 @@ Item {
         property string lastEthJson: ""
     }
 
-    readonly property string cacheDir: Quickshell.env("XDG_RUNTIME_DIR") ? (Quickshell.env("XDG_RUNTIME_DIR") + "/qs_network") : (Quickshell.env("HOME") + "/.cache/qs_network")
+    readonly property string cacheDir: paths.getCacheDir("network")
     readonly property string modeFilePath: cacheDir + "/mode"
 
     property bool ethPresent: false
@@ -354,7 +356,6 @@ Item {
 
     onActiveModeChanged: {
         if (!window.ignoreNextModeFileUpdate) {
-            // FIX: Guaranteed directory creation before state write to prevent ghost cache races
             Quickshell.execDetached(["bash", "-c", "mkdir -p '" + window.cacheDir + "' && echo '" + window.activeMode + "' > '" + window.modeFilePath + "'"]);
         }
         window.ignoreNextModeFileUpdate = false;
