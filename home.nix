@@ -21,8 +21,8 @@ in
     ./config/sessions/hyprland/default.nix
   ] ++ programImports; 
 
-  home.username = "ilyamiro";
-  home.homeDirectory = "/home/ilyamiro";
+  home.username = "AgiSoham";
+  home.homeDirectory = "/home/AgiSoham";
   home.stateVersion = "25.11"; 
   
   home.packages = with pkgs; [
