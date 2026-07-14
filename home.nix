@@ -73,8 +73,8 @@ in
     enable = true;
     
     # IMPORT DYNAMIC MATUGEN COLORS 
-    gtk3.extraCss = ''@import url("file:///home/ilyamiro/.cache/matugen/colors-gtk.css");'';
-    gtk4.extraCss = ''@import url("file:///home/ilyamiro/.cache/matugen/colors-gtk.css");'';
+    gtk3.extraCss = ''@import url("file:///home/AgiSoham/.cache/matugen/colors-gtk.css");'';
+    gtk4.extraCss = ''@import url("file:///home/AgiSoham/.cache/matugen/colors-gtk.css");'';
     
     # Target GTK3 specifically
     gtk3.extraConfig = {
