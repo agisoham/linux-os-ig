@@ -270,6 +270,7 @@
   useOSProber = true;
 };
 boot.loader.efi.canTouchEfiVariables = true;
+boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
   # Kernel Packages and Optimization
   boot.kernelPackages = pkgs.linuxPackages_latest;
