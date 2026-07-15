@@ -1,36 +1,48 @@
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/ilyamiro)
+# linux-nixos
 
-# Big announcement to all of my users! 
-### Starting from 12.05.2026, the version of my dots will remain available for arch on version v1.7.6, since I am working on a very big update - v2.0.0. It will shift the whole paradigm - instead of being invasive into your configs, the shell will actually be a "shell" and be just a quickshell configuration on top of your compositor - that will extend the support onto Niri, MangoWM, and other wayland compositors other than Hyprland. The new update will also make everything much more optimized and efficient and will be out in a span of a month. Thank you!
+My personal NixOS configuration — Hyprland desktop with a Quickshell-based shell, dynamic Material You theming (matugen), and a triple-boot setup alongside Windows and Ubuntu.
 
-
-## Do NOT install it on NixOS. This config has a lot adapting to do, until I introduce flakes.
-## Arch installer now available for everyone. Just run this: 
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilyamiro/imperative-dots/master/install.sh)"
-```
-
-> [!WARNING]
-> DO NOT LAUNCH THIS AS ROOT!
+Forked from [ilyamiro/nixos-configuration](https://github.com/ilyamiro/nixos-configuration) and adapted for my own machine. All credit for the original rice, shell, and theming work goes to [ilyamiro](https://github.com/ilyamiro). Desktop previews of the original setup are in [`previews/`](previews/).
 
 > [!NOTE]
-> This installer sends anonymous non-identifying telemetry that helps me debug problems and track the amount of users
+> This is a personal config, tuned to my hardware and user account. It is not an installer or a distro — if you want to use it, fork it and audit/adapt it the same way I did.
 
-### You can find all of my wallpapers **[HERE](https://github.com/ilyamiro/shell-wallpapers)**.
+## Changes from upstream
 
-## Previews of my desktop
+- Removed passwordless `sudo` (`NOPASSWD`) rule
+- Removed the OpenSSH daemon (no remote login service by default)
+- Migrated all user references from `ilyamiro` → `AgiSoham` (system user, home-manager, GTK theming paths, shell aliases)
+- Switched bootloader from systemd-boot to **GRUB with os-prober** to auto-detect Windows and Ubuntu in a triple-boot setup
+- Set Intel CPU microcode updates (upstream is AMD)
+- Removed `hardware-configuration.nix` from the repo — it is machine-specific and must be generated locally by the NixOS installer (`.gitignore` keeps it out)
 
----
+> [!WARNING]
+> The upstream README's Arch installer (`curl | bash`) does **not** apply to this repo. Do not run it.
 
-![preview1](previews/screenshot1.png)
-![preview2](previews/screenshot2.png)
-![preview3](previews/screenshot3.png)
-![preview4](previews/screenshot4.png)
-![preview5](previews/screenshot5.png)
-![preview6](previews/screenshot6.png)
-![preview7](previews/screenshot7.png)
-![preview8](previews/screenshot8.png)
-![preview9](previews/screenshot9.png)
-![preview10](previews/screenshot10.png)
+## Install (how I deploy this)
 
+1. Install NixOS normally from the graphical ISO. The installer generates `/etc/nixos/hardware-configuration.nix` for the actual machine — that file stays local and is never committed here.
+2. Copy this repo's contents into `/etc/nixos/`, replacing the default `configuration.nix` but **keeping the generated `hardware-configuration.nix`**:
+
+   ```bash
+   cd /etc/nixos
+   sudo git clone https://github.com/agisoham/linux-nixos.git temp
+   sudo cp -r temp/* temp/.gitignore .
+   sudo rm -rf temp
+   ```
+
+3. Rebuild:
+
+   ```bash
+   sudo nixos-rebuild switch
+   ```
+
+## Structure
+
+- `configuration.nix` — system-level config (boot, users, services, packages)
+- `home.nix` — user environment via home-manager
+- `config/` — program configs: Hyprland session, Quickshell widgets, zsh, fonts, and more
+
+## License / attribution
+
+Original work © [ilyamiro](https://github.com/ilyamiro/nixos-configuration); this fork carries my personal modifications on top.
